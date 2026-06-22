@@ -1,136 +1,101 @@
 import SwiftUI
-import Charts
 
 struct GridView: View {
     @EnvironmentObject var appModel: AppModel
 
-    @State private var sliderValue: Double = 5
-    @State private var logged = false
-
-    private var chartEntries: [WaveEntry] {
-        Array(appModel.recentEntries.reversed())
-    }
+    private var task: TidyTask? { appModel.todayTask }
+    private var assignment: DailyAssignment? { appModel.todayAssignment }
 
     var body: some View {
-        VStack(spacing: 20) {
-            // Wave chart
-            if chartEntries.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "waveform")
-                        .font(.system(size: 44))
-                        .foregroundStyle(Color.qmAccent.opacity(0.4))
-                    Text("Log your first energy level below")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+        VStack(spacing: 0) {
+            if let task, let assignment {
+                ZoneTag(zone: task.zone)
+                    .padding(.bottom, 12)
+
+                Text(task.title)
+                    .font(.title3.weight(.semibold))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.caption)
+                    Text("\(task.minutes) min")
+                        .font(.caption)
                 }
-                .frame(height: 140)
-                .frame(maxWidth: .infinity)
-            } else {
-                Chart {
-                    ForEach(Array(chartEntries.enumerated()), id: \.offset) { idx, entry in
-                        AreaMark(
-                            x: .value("Day", idx),
-                            yStart: .value("Base", 0),
-                            yEnd: .value("Level", entry.level)
-                        )
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color.qmAccent.opacity(0.25), Color.qmAccent.opacity(0.05)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .interpolationMethod(.catmullRom)
+                .foregroundStyle(.secondary)
+                .padding(.top, 6)
 
-                        LineMark(
-                            x: .value("Day", idx),
-                            y: .value("Level", entry.level)
-                        )
-                        .foregroundStyle(Color.qmAccent)
-                        .lineStyle(StrokeStyle(lineWidth: 2.5))
-                        .interpolationMethod(.catmullRom)
+                Spacer(minLength: 28)
 
-                        PointMark(
-                            x: .value("Day", idx),
-                            y: .value("Level", entry.level)
-                        )
-                        .foregroundStyle(Color.qmAccent)
-                        .symbolSize(36)
-                    }
-                }
-                .chartYScale(domain: 0...10)
-                .chartXAxis(.hidden)
-                .chartYAxis {
-                    AxisMarks(values: [0, 5, 10]) { value in
-                        AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [4]))
-                            .foregroundStyle(Color.qmHair)
-                        AxisValueLabel {
-                            if let v = value.as(Int.self) {
-                                Text("\(v)")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-                .frame(height: 140)
-            }
-
-            // Divider
-            Divider()
-
-            // Log energy section
-            VStack(spacing: 12) {
-                HStack {
-                    Text("Energy level")
+                if assignment.isDone {
+                    DoneCheckmark()
+                        .padding(.bottom, 8)
+                    Text("Done for today!")
                         .font(.headline)
-                    Spacer()
-                    Text("\(Int(sliderValue.rounded()))")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(Color.qmAccent)
-                        .monospacedDigit()
-                        .frame(width: 32)
-                }
-
-                Slider(value: $sliderValue, in: 0...10, step: 1)
-                    .tint(Color.qmAccent)
-                    .onChange(of: sliderValue) { _, _ in
-                        Haptics.tap()
-                        logged = false
-                    }
-
-                HStack {
-                    Text("Low")
+                        .foregroundStyle(Color.qmCorrect)
+                    Text("Come back tomorrow for the next task.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Spacer()
-                    Text("High")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Button {
-                    appModel.logEnergy(level: Int(sliderValue.rounded()))
-                    Haptics.success()
-                    logged = true
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: logged ? "checkmark" : "waveform.path")
-                        Text(logged ? "Logged" : "Log Today's Energy")
+                        .padding(.top, 4)
+                } else {
+                    Button {
+                        appModel.markTodayDone()
+                    } label: {
+                        Label("Mark Done", systemImage: "checkmark")
+                            .frame(maxWidth: .infinity)
                     }
-                    .frame(maxWidth: .infinity)
+                    .prominentButton()
+                    .padding(.horizontal, 8)
                 }
-                .prominentButton()
-                .disabled(logged)
-                .animation(.easeInOut(duration: 0.2), value: logged)
+            } else {
+                Image(systemName: "sparkles")
+                    .font(.largeTitle)
+                    .foregroundStyle(Color.qmAccent)
+                    .padding(.bottom, 8)
+                Text("Loading today's task…")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
         }
-        .qmCard()
+        .padding(24)
+        .frame(maxWidth: .infinity, minHeight: 220)
+        .background(Color.qmCard, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Sub-views
+
+private struct ZoneTag: View {
+    let zone: String
+    var body: some View {
+        Text(zone.uppercased())
+            .font(.caption2.weight(.semibold))
+            .tracking(1.2)
+            .foregroundStyle(Color.qmAccent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Color.qmAccent.opacity(0.12), in: Capsule())
+    }
+}
+
+private struct DoneCheckmark: View {
+    @State private var appeared = false
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.qmCorrect.opacity(0.15))
+                .frame(width: 72, height: 72)
+            Image(systemName: "checkmark")
+                .font(.system(size: 32, weight: .bold))
+                .foregroundStyle(Color.qmCorrect)
+                .scaleEffect(appeared ? 1 : 0.4)
+                .opacity(appeared ? 1 : 0)
+        }
         .onAppear {
-            if let today = appModel.todayEntry {
-                sliderValue = Double(today.level)
-                logged = true
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.6)) {
+                appeared = true
             }
         }
     }

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct HomeView: View {
     var forceScreen: String? = nil
@@ -11,111 +12,98 @@ struct HomeView: View {
     @State private var showInsights = false
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                QMBackground()
-
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Header
-                        VStack(spacing: 4) {
-                            Text("Tideline")
-                                .font(.largeTitle.weight(.bold))
-                            Text("Ride your daily mood wave")
+        ZStack {
+            QMBackground()
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("TidyKitchen")
+                                .font(.title2.weight(.bold))
+                            Text("5-minute kitchen reset")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(.top, 8)
-
-                        // Today's entry card
-                        GridView()
-                            .padding(.horizontal, 16)
-
-                        // Stats row
-                        HStack(spacing: 12) {
-                            MetricTile(
-                                value: appModel.todayEntry.map { "\($0.level)" } ?? "-",
-                                label: "Today"
-                            )
-                            MetricTile(
-                                value: String(format: "%.1f", appModel.sevenDayAverage),
-                                label: "7-day avg"
-                            )
-                            MetricTile(
-                                value: "\(appModel.currentStreak)",
-                                label: "Streak"
-                            )
+                        Spacer()
+                        Button { showSettings = true } label: {
+                            Image(systemName: "gearshape")
+                                .font(.title3)
+                                .foregroundStyle(Color.qmAccent)
+                                .padding(10)
+                                .background(Color.qmCard, in: Circle())
                         }
-                        .padding(.horizontal, 16)
-
-                        // Pro tile
-                        Button {
-                            if store.isPro {
-                                showInsights = true
-                            } else {
-                                showPaywall = true
-                            }
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(store.isPro ? "Tideline Pro" : "Unlock Insights")
-                                        .font(.headline)
-                                    Text(store.isPro ? "History, dual-wave & trends" : "Multi-month history + dual-wave")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Image(systemName: store.isPro ? "waveform.path.ecg" : "lock.fill")
-                                    .foregroundStyle(Color.qmAccent)
-                                    .font(.title3)
-                            }
-                            .qmCard()
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 16)
-
-                        Spacer(minLength: 32)
                     }
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+
+                    // Streak tiles (always visible, values shown to all)
+                    HStack(spacing: 12) {
+                        MetricTile(
+                            value: "\(appModel.streak?.currentCount ?? 0)",
+                            label: "Day Streak"
+                        )
+                        MetricTile(
+                            value: "\(appModel.streak?.longestCount ?? 0)",
+                            label: "Best Streak"
+                        )
+                    }
+                    .padding(.horizontal)
+
+                    // Today's task card
+                    GridView()
+
+                    // Pro tile
                     Button {
-                        showSettings = true
+                        if store.isPro { showInsights = true } else { showPaywall = true }
                     } label: {
-                        Image(systemName: "gearshape")
-                            .foregroundStyle(Color.qmAccent)
+                        HStack(spacing: 14) {
+                            Image(systemName: store.isPro ? "chart.bar.fill" : "lock.fill")
+                                .font(.title3)
+                                .foregroundStyle(Color.qmAccent)
+                                .frame(width: 32)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(store.isPro ? "Your Insights" : "Unlock Pro")
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+                                Text(store.isPro
+                                    ? "Streaks, calendar, custom zones"
+                                    : "Streaks, reminders & more — $0.99/mo")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .qmCard()
+                        .padding(.horizontal)
                     }
+                    .buttonStyle(.plain)
+
+                    Spacer(minLength: 40)
                 }
-            }
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
-                    .environmentObject(store)
-                    .environmentObject(appModel)
-            }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .environmentObject(store)
-            }
-            .sheet(isPresented: $showInsights) {
-                InsightsView()
-                    .environmentObject(appModel)
-                    .environmentObject(store)
-            }
-            .onAppear {
-                handleForceScreen()
+                .padding(.vertical)
             }
         }
-    }
-
-    private func handleForceScreen() {
-        guard let screen = forceScreen else { return }
-        switch screen {
-        case "paywall": showPaywall = true
-        case "insights": showInsights = true
-        case "settings": showSettings = true
-        default: break
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environmentObject(store)
+                .environmentObject(appModel)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
+                .environmentObject(store)
+        }
+        .sheet(isPresented: $showInsights) {
+            InsightsView()
+                .environmentObject(appModel)
+        }
+        .onAppear {
+            if forceScreen == "paywall" { showPaywall = true }
+            if forceScreen == "insights" { showInsights = true }
+            if forceScreen == "settings" { showSettings = true }
         }
     }
 }
